@@ -22,9 +22,10 @@ typedef struct ITypeInstruction_Arithmetic_Imm {
 } itype_arithmetic_imm;
 
 typedef struct ITypeInstruction_Arithmetic_Shamt {
+    std::string inst;
     std::string rd;
     std::string rs1;
-    std::string sham;
+    std::string shamt;
     std::string opcode;
     std::string funct3;
     std::string funct7;
@@ -34,8 +35,9 @@ typedef struct ITypeInstruction_Arithmetic_Shamt {
 } itype_arithmetic_shamt;
 
 typedef struct ITypeInstruction_Load {
+    std::string inst;
     std::string rd;
-    std::string offset;
+    std::string imm;
     std::string rs1;
     std::string opcode;
     std::string funct3;
@@ -54,7 +56,7 @@ typedef struct ITypeInstruction_Jump {
 
 } itype_jump;
 
-
+std::vector<std::string> binaryInstructions; // holds all binary reps
 
 std::string registerToBinary(const std::string registerName) {
     std::unordered_map<std::string, int> registerMap = {
@@ -99,6 +101,51 @@ std::string registerToBinary(const std::string registerName) {
 }
 
 
+int convert_IType_Arithmetic_Shamt(std::string instructionInput) {
+    // tokenize to make instruction
+    std:std::istringstream sstream(instructionInput);
+    std::string instructionToken;
+    std::vector<std::string> instructionTokens;
+
+    while(sstream >> instructionToken) { // while sep by whitespace
+        instructionTokens.push_back(instructionToken);
+
+    }
+
+    itype_arithmetic_shamt instruction;
+    
+    instruction.inst=instructionTokens[0];
+    instruction.rd=instructionTokens[1].substr(0, 2); // get rid of comma
+    instruction.rs1=instructionTokens[2].substr(0, 2); // get rid of comma
+    instruction.shamt=instructionTokens[3];
+    instruction.opcode="0010011";
+
+    if(instruction.inst=="slli") {
+        instruction.funct3="001";
+        instruction.funct7="0000000";
+
+    } else if(instruction.inst=="srli") {
+        instruction.funct3="101";
+        instruction.funct7="0000000";
+
+    } else if(instruction.inst=="srai") {
+        instruction.funct3="101";
+        instruction.funct7="0100000";
+        
+    } 
+
+    instruction.rd = registerToBinary(instruction.rd);
+    instruction.rs1 = registerToBinary(instruction.rs1);
+    instruction.shamt = std::bitset<12>(std::stoi(instruction.shamt) & 0xFFF).to_string();
+
+    instruction.label=instruction.shamt+instruction.rs1+instruction.funct3+instruction.rd+instruction.opcode; // if we need the string representation
+
+    binaryInstructions.push_back(instruction.label); // add to a binary instructions vector
+
+    return(std::stoi(instruction.label, nullptr, 2)); // if we need the int representation
+
+}
+
 int convert_IType_Arithmetic_Imm(std::string instructionInput) {
     // tokenize to make instruction
     std:std::istringstream sstream(instructionInput);
@@ -140,19 +187,65 @@ int convert_IType_Arithmetic_Imm(std::string instructionInput) {
 
     instruction.rd = registerToBinary(instruction.rd);
     instruction.rs1 = registerToBinary(instruction.rs1);
-    instruction.imm = std::bitset<12>(std::stoi(instruction.imm)).to_string();
+    instruction.imm = std::bitset<12>(std::stoi(instruction.imm) & 0xFFF).to_string();
 
-    instruction.label=instruction.imm+instruction.rs1+instruction.funct3+instruction.rd+instruction.opcode;
+    instruction.label=instruction.imm+instruction.rs1+instruction.funct3+instruction.rd+instruction.opcode; // if we need the string representation
+
+    binaryInstructions.push_back(instruction.label); // add to a binary instructions vector
+
+    return(std::stoi(instruction.label, nullptr, 2)); // if we need the int representation
 
 }
 
-int convert_IType_Arithmetic_Shamt(std::string inst) {
+int convert_IType_Load(std::string instructionInput) {
+    // tokenize to make instruction
+    std:std::istringstream sstream(instructionInput);
+    std::string instructionToken;
+    std::vector<std::string> instructionTokens;
 
+    while(sstream >> instructionToken) { // while sep by whitespace
+        instructionTokens.push_back(instructionToken);
 
-}
+    }
 
-int convert_IType_Load(std::string inst) {
+    itype_load instruction;
+    
+    instruction.inst=instructionTokens[0];
 
+    instruction.rd=instructionTokens[1].substr(0, 2); // get rid of comma
+
+    int offset = std::stoi(instructionTokens[2].substr(0, 1));
+    instruction.imm = std::bitset<12>(offset & 0xFFF).to_string(); // & 0xFFF handles neg values
+
+    instruction.rs1 = std::bitset<5>(std::stoi(instructionTokens[2].substr(2, 2)) & 0xFFF).to_string();
+
+    instruction.opcode="0010011";
+
+    if(instruction.inst=="lb") {
+        instruction.funct3="000";
+
+    } else if(instruction.inst=="lh") {
+        instruction.funct3="001";
+
+    } else if(instruction.inst=="lw") {
+        instruction.funct3="010";
+        
+    } else if(instruction.inst=="lbu") {
+        instruction.funct3="100";
+        
+    } else if(instruction.inst=="lhu") {
+        instruction.funct3="101";
+        
+    } 
+
+    instruction.rd = registerToBinary(instruction.rd);
+    instruction.rs1 = registerToBinary(instruction.rs1);
+
+    instruction.label=instruction.imm+instruction.rs1+instruction.funct3+instruction.rd+instruction.opcode; // if we need the string representation
+
+    binaryInstructions.push_back(instruction.label); // add to a binary instructions vector
+
+    return(std::stoi(instruction.label, nullptr, 2)); // if we need the int representation
 
 }
 
