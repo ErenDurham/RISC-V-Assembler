@@ -10,3 +10,5 @@ lh t2, 2(t1)
 lw t2, 4(t1)
 lbu t2, 5(t1)
 lhu t2, 2(t1)
+addi t4, t4, %lo(c)
+bge t1, t3, shift

@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <type_traits>
-
+#include <unordered_map>
 
 std::string processRType(std::string line, const Instruction* instruction);
 
@@ -11,140 +11,130 @@ std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, con
 std::string convert_IType_Load_Jump(std::string instructionInput, const Instruction* instruction);
 
 void processSType(std::string line, const Instruction* instruction);
-void processBType(std::string line, const Instruction* instruction);
+std::string processBType(std::string line, const Instruction* instruction);
 void processUType(std::string line, const Instruction* instruction);
 void processJType(std::string line, const Instruction* instruction);
-
+uint32_t parseImmediate(const std::string immediate);
 
 // Global map to store label addresses
 static std::unordered_map<std::string, int32_t> SymbolTable;
 int PC;
 
 int main() {
-  // The filename to read
-  std::string filename = "add_shift.s";
+    // The filename to read
+    std::string filename = "add_shift.s";
 
-  // Open the file
-  std::ifstream inputFile(filename);
+    // Open the file
+    std::ifstream inputFile(filename);
 
     std::ofstream binaryFile("add_shift.bin");
-      std::ofstream hexFile("add_shift.hex.txt");
+    std::ofstream hexFile("add_shift.hex.txt");
 
-
-
-  // Check if the file opened successfully
-  if (!inputFile.is_open()) {
-    std::cerr << "Error: Could not open file " << filename << std::endl;
-    return 1;
-  }
-
-  // Read and print line by line
-  std::string line;  // Create the base string object
-  std::string token; // create base toekn
-  int lineNum = 0;
-  while (std::getline(inputFile, line)) {
-
-    std::cout << lineNum << ": \t|";
-    std::cout << line;
-    // for (char c : line) {
-    // 	std::cout << c << std::endl;
-    // }
-    lineNum++;
-
-    // Here we should have it such that it check what type of line it is:
-    // the types are:
-    //	Function (ie main:)
-    //	instruction (add)
-    //	comment (#)
-    //	and for now, unknown
-    // Let start with creating
-    // we should use the hader file for doing the following, checking if the
-    // header variable exists, and if so we know it is an instruction, and from
-    // there we should return back the struct of that object
-    //		IE: for line 21, it is lui, which is an instruction, and should
-    // return (U, 011 0111, 2) (type, op code, number of oprerands)
-    //
-    //		how do we do a lookup on the header file for checking to see if
-    // it exists.
-
-    // first things first, lets get the tokens for now
-
-    std::stringstream ss(line);
-    ss >> token;
-
-    // std::cout << token<< '\t';
-
-    if (token == "#") {
-      // std::cout << "\tit was a comment"  << std::endl;
-
-    } else {
-      const Instruction *instruction = getInstructions(token);
-
-      std::string label;
-
-      if (instruction != nullptr) {
-        // std::cout << "Found the following: ";
-        // std::cout << instruction->name << '\t';
-        // std::cout << instruction->opcode<< '\t';
-        // std::cout <<  typeToString(instruction->type)<< '\t';
-        // std::cout << instruction->funct3 << '\t';
-        // std::cout << instruction->funct7 << '\t';
-
-        // this means we found a proper instructions
-
-        switch (instruction->type) {
-
-        case InstructionType::R:
-          label = processRType(line, instruction);
-          break;
-        case InstructionType::I:
-            if (instruction->name == "addi" || instruction->name == "slti" || instruction->name == "sltiu" || instruction->name == "xori" || instruction->name == "ori"|| instruction->name == "andi" || instruction->name == "slli" || instruction->name == "srli" || instruction->name == "srai") {
-                label = convert_IType_Arithmetic_Imm_Shamt(line, instruction);
-
-            } else if(instruction->name == "lb" || instruction->name == "lh" || instruction->name == "lw" || instruction->name == "lbu" || instruction->name == "lhu" || instruction->name == "jalr") {
-                label = convert_IType_Load_Jump(line, instruction);
-
-            }
-            break;
-
-        case InstructionType::S:
-          processSType(line, instruction);
-          break;
-        case InstructionType::B:
-          processBType(line, instruction);
-          break;
-        case InstructionType::U:
-          processUType(line, instruction);
-          break;
-        case InstructionType::J:
-          processJType(line, instruction);
-          break;
-        default:
-          std::cout << "defaulting";
-          break;
-        }
-      }
-
-
-      if(binaryFile.is_open()) {
-
-        binaryFile << label << std::endl;
-
-      }
-
-
-      uint32_t binaryDecimalForm = std::bitset<32>(label).to_ulong();
-      std::string hexForm = binaryToHex(binaryDecimalForm);
-
-      if(hexFile.is_open()) {
-
-        hexFile << "0x" + hexForm << std::endl;
-
-      }
-
+    // Check if the file opened successfully
+    if (!inputFile.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        return 1;
     }
 
+    // Read and print line by line
+    std::string line;  // Create the base string object
+    std::string token; // create base toekn
+    int lineNum = 0;
+    while (std::getline(inputFile, line)) {
+        std::cout << lineNum << ": \t|";
+        std::cout << line;
+        
+        lineNum++;
 
+        // Here we should have it such that it check what type of line it is:
+        // the types are:
+        //	Function (ie main:)
+        //	instruction (add)
+        //	comment (#)
+        //	and for now, unknown
+        // Let start with creating
+        // we should use the hader file for doing the following, checking if the
+        // header variable exists, and if so we know it is an instruction, and from
+        // there we should return back the struct of that object
+        //		IE: for line 21, it is lui, which is an instruction, and should
+        // return (U, 011 0111, 2) (type, op code, number of oprerands)
+        //
+        //		how do we do a lookup on the header file for checking to see if
+        // it exists.
+
+        // first things first, lets get the tokens for now
+
+        std::stringstream ss(line);
+        ss >> token;
+
+
+        if (token.empty() || token == "#" || token[0] == '#' || token == ".data" || token == ".text" || token == ".globl" || token == ".word" || token.find(':') != std::string::npos) {
+            std::cout << std::endl;
+            continue;
+
+        } else {
+            const Instruction *instruction = getInstructions(token);
+
+            std::string label = "";
+
+            if (instruction != nullptr) {
+                switch (instruction->type) {
+
+                case InstructionType::R:
+                    label = processRType(line, instruction);
+                    break;
+                case InstructionType::I:
+                    if (instruction->name == "addi" || instruction->name == "slti" || instruction->name == "sltiu" || instruction->name == "xori" || instruction->name == "ori"|| instruction->name == "andi" || instruction->name == "slli" || instruction->name == "srli" || instruction->name == "srai") {
+                        label = convert_IType_Arithmetic_Imm_Shamt(line, instruction);
+
+                    } else if(instruction->name == "lb" || instruction->name == "lh" || instruction->name == "lw" || instruction->name == "lbu" || instruction->name == "lhu" || instruction->name == "jalr") {
+                        label = convert_IType_Load_Jump(line, instruction);
+
+                    }
+                    break;
+
+                case InstructionType::S:
+                    processSType(line, instruction);
+                    break;
+
+                case InstructionType::B:
+                    label = processBType(line, instruction);
+                    break;
+
+                case InstructionType::U:
+                    processUType(line, instruction);
+                    break;
+
+                case InstructionType::J:
+                    processJType(line, instruction);
+                    break;
+
+                default:
+                    std::cout << "defaulting";
+                    break;
+                }
+            }
+
+            if(!label.empty() && label.length() == 32) {
+                if(binaryFile.is_open()) {
+
+                    binaryFile << label << std::endl;
+
+                }
+
+
+                uint32_t binaryDecimalForm = std::bitset<32>(label).to_ulong();
+                std::string hexForm = binaryToHex(binaryDecimalForm);
+
+                if(hexFile.is_open()) {
+
+                    hexFile << "0x" + hexForm << std::endl;
+
+                }
+
+            }
+
+        }
 
     std::cout << std::endl;
     // now we do checks to see what type of thing it is
@@ -153,6 +143,7 @@ int main() {
   // Close the file (optional as destructor closes it, but good practice)
 
   binaryFile.close();
+  hexFile.close();
   inputFile.close();
 
   return 0;
@@ -242,7 +233,9 @@ std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, con
 
 	rd = std::bitset<5>(getRegister(rd)->address).to_string();
 	rs1 = std::bitset<5>(getRegister(rs1)->address).to_string();
-	immshamt = std::bitset<12>(std::stoi(immshamt) & 0xFFF).to_string();
+
+    int immediateValue = parseImmediate(immshamt);
+    immshamt = std::bitset<12>(immediateValue & 0xFFF).to_string();
 
     // std::cout << (immshamt+rs1+std::bitset<3>((instruction->funct3) & 0xFFF).to_string()+rd+std::bitset<7>((instruction->opcode) & 0xFFF).to_string());
 
@@ -264,8 +257,9 @@ std::string convert_IType_Load_Jump(std::string instructionInput, const Instruct
 
 	std::string offsetrs1 = instructionTokens[2];
 
-	int offset = std::stoi(offsetrs1.substr(0, offsetrs1.find('(')));
-	
+	std::string offsetStr = (offsetrs1.substr(0, offsetrs1.find('(')));
+	int offset = parseImmediate(offsetStr);
+
     std::string imm = std::bitset<12>(offset & 0xFFF).to_string();
     
 	int leftparenthesis = offsetrs1.find('(');
@@ -280,7 +274,7 @@ std::string convert_IType_Load_Jump(std::string instructionInput, const Instruct
 	return (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
 }
 
-void processBType(std::string line, const Instruction *instruction) {
+std::string processBType(std::string line, const Instruction *instruction) {
   
   // B = imm12 + imm10_5 + rs2 + rs1 + funct3 + imm4_1 + imm11 + opcode
   std::stringstream ss(line);
@@ -351,10 +345,9 @@ void processBType(std::string line, const Instruction *instruction) {
   inst |= instruction->opcode; // B-type opcode is 0x63 (0b1100011)
 
   // Output results
-  std::string binInst = std::bitset<32>(inst).to_string();
-  std::string hexInst = binaryToHex(inst);
+  return std::bitset<32>(inst).to_string();
+//   std::string hexInst = binaryToHex(inst);
 
-  std::cout << "\tBinary: " << binInst << " | Hex: " << hexInst << std::endl;
 }
 
 void processSType(std::string line, const Instruction* instruction)
@@ -370,3 +363,40 @@ void processJType(std::string line, const Instruction* instruction)
 	// J = imm + rd + opcode	
 }
 
+
+uint32_t parseImmediate(const std::string immediate) {
+	if(immediate.find("%hi")==0) {
+		int startIndex = immediate.find('(')+1;
+		int endIndex = immediate.find(')');
+		std::string imm = immediate.substr(startIndex, endIndex-startIndex);
+
+		if(SymbolTable.find(imm)!=SymbolTable.end()) {
+            int address = SymbolTable[imm];
+            return(address>>12)&0xFFFFF;
+
+        } else {
+            return -1;
+
+        }
+
+	}
+
+    if(immediate.find("%lo")==0) {
+        int startIndex = immediate.find('(')+1;
+		int endIndex = immediate.find(')');
+		std::string imm = immediate.substr(startIndex, endIndex-startIndex);
+
+        if(SymbolTable.find(imm)!=SymbolTable.end()) {
+            int address = SymbolTable[imm];
+            return address & 0xFFF;
+
+        } else {
+            return -1;
+
+        }
+
+    }
+
+    return std::stoi(immediate); // return reg immediate lol
+
+}
