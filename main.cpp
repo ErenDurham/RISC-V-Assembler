@@ -3,159 +3,113 @@
 #include <fstream>
 #include <iostream>
 #include <type_traits>
+#include <bitset>
+#include <tuple>
 
+std::unordered_map<std::string, uint32_t> symbolTable;
+uint32_t currentAddress = 0x0;
 
+void firstPass(std::string filename);
 std::string processRType(std::string line, const Instruction* instruction);
-
 std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, const Instruction * instruction);
 std::string convert_IType_Load_Jump(std::string instructionInput, const Instruction* instruction);
-
 void processSType(std::string line, const Instruction* instruction);
-void processBType(std::string line, const Instruction* instruction);
+std::string processBType(std::string line, const Instruction* instruction);
 void processUType(std::string line, const Instruction* instruction);
 void processJType(std::string line, const Instruction* instruction);
 
-
-// Global map to store label addresses
-static std::unordered_map<std::string, int32_t> SymbolTable;
-int PC;
-
 int main() {
-  // The filename to read
-  std::string filename = "add_shift.s";
+	// The filename to read
+	std::string filename = "add_shift.s";
 
-  // Open the file
-  std::ifstream inputFile(filename);
+	// Run First Pass to build Symbol Table
+	firstPass(filename);
 
-    std::ofstream binaryFile("add_shift.bin");
-      std::ofstream hexFile("add_shift.hex.txt");
+	// Print Symbol Table for verification (Optional, can be removed later)
+	std::cout << "Symbol Table:" << std::endl;
+	for (const auto& pair : symbolTable) {
+		std::cout << pair.first << ": " << pair.second << std::endl;
+	}
+	std::cout << "--------------------------------" << std::endl;
 
+	// Open the file for Second Pass
 
+	// Open the file
+	std::ifstream inputFile(filename);
 
-  // Check if the file opened successfully
-  if (!inputFile.is_open()) {
-    std::cerr << "Error: Could not open file " << filename << std::endl;
-    return 1;
-  }
+	// Check if the file opened successfully
+	if (!inputFile.is_open()) {
+		std::cerr << "Error: Could not open file " << filename << std::endl;
+		return 1;
+	}
 
-  // Read and print line by line
-  std::string line;  // Create the base string object
-  std::string token; // create base toekn
-  int lineNum = 0;
+  currentAddress = 0;
+
+	// Read and print line by line
+	std::string line; // Create the base string object
+	std::string token;	// create base toekn
+	int lineNum = 0;
   while (std::getline(inputFile, line)) {
+      std::cout << lineNum << ": \t|" << line;
+      lineNum++;
 
-    std::cout << lineNum << ": \t|";
-    std::cout << line;
-    // for (char c : line) {
-    // 	std::cout << c << std::endl;
-    // }
-    lineNum++;
+      // strip comments like first pass
+      size_t commentPos = line.find('#');
+      if (commentPos != std::string::npos)
+          line = line.substr(0, commentPos);
 
-    // Here we should have it such that it check what type of line it is:
-    // the types are:
-    //	Function (ie main:)
-    //	instruction (add)
-    //	comment (#)
-    //	and for now, unknown
-    // Let start with creating
-    // we should use the hader file for doing the following, checking if the
-    // header variable exists, and if so we know it is an instruction, and from
-    // there we should return back the struct of that object
-    //		IE: for line 21, it is lui, which is an instruction, and should
-    // return (U, 011 0111, 2) (type, op code, number of oprerands)
-    //
-    //		how do we do a lookup on the header file for checking to see if
-    // it exists.
+      std::stringstream ss(line);
+      std::string token;
+      if (!(ss >> token)) {
+          std::cout << std::endl;
+          continue;
+      }
 
-    // first things first, lets get the tokens for now
+      // handle labels like first pass
+      if (token.back() == ':') {
+          // label, ignore for PC in pass 2
+          if (!(ss >> token)) {  // maybe there's an instruction after the label
+              std::cout << std::endl;
+              continue;
+          }
+      }
 
-    std::stringstream ss(line);
-    ss >> token;
-
-    // std::cout << token<< '\t';
-
-    if (token == "#") {
-      // std::cout << "\tit was a comment"  << std::endl;
-
-    } else {
-      const Instruction *instruction = getInstructions(token);
-
-      std::string label;
-
+      const Instruction* instruction = getInstructions(token);
       if (instruction != nullptr) {
-        // std::cout << "Found the following: ";
-        // std::cout << instruction->name << '\t';
-        // std::cout << instruction->opcode<< '\t';
-        // std::cout <<  typeToString(instruction->type)<< '\t';
-        // std::cout << instruction->funct3 << '\t';
-        // std::cout << instruction->funct7 << '\t';
+          switch (instruction->type) {
+              case InstructionType::R:
+                  processRType(line, instruction);
+                  break;
+              case InstructionType::I:
+                  // ...
+                  break;
+              case InstructionType::S:
+                  processSType(line, instruction);
+                  break;
+              case InstructionType::B:
+                  processBType(line, instruction);
+                  break;
+              case InstructionType::U:
+                  processUType(line, instruction);
+                  break;
+              case InstructionType::J:
+                  processJType(line, instruction);
+                  break;
+              default:
+                  break;
+          }
 
-        // this means we found a proper instructions
-
-        switch (instruction->type) {
-
-        case InstructionType::R:
-          label = processRType(line, instruction);
-          break;
-        case InstructionType::I:
-            if (instruction->name == "addi" || instruction->name == "slti" || instruction->name == "sltiu" || instruction->name == "xori" || instruction->name == "ori"|| instruction->name == "andi" || instruction->name == "slli" || instruction->name == "srli" || instruction->name == "srai") {
-                label = convert_IType_Arithmetic_Imm_Shamt(line, instruction);
-
-            } else if(instruction->name == "lb" || instruction->name == "lh" || instruction->name == "lw" || instruction->name == "lbu" || instruction->name == "lhu" || instruction->name == "jalr") {
-                label = convert_IType_Load_Jump(line, instruction);
-
-            }
-            break;
-
-        case InstructionType::S:
-          processSType(line, instruction);
-          break;
-        case InstructionType::B:
-          processBType(line, instruction);
-          break;
-        case InstructionType::U:
-          processUType(line, instruction);
-          break;
-        case InstructionType::J:
-          processJType(line, instruction);
-          break;
-        default:
-          std::cout << "defaulting";
-          break;
-        }
+          currentAddress += 4;  // PC for next instruction
       }
 
-
-      if(binaryFile.is_open()) {
-
-        binaryFile << label << std::endl;
-
-      }
-
-
-      uint32_t binaryDecimalForm = std::bitset<32>(label).to_ulong();
-      std::string hexForm = binaryToHex(binaryDecimalForm);
-
-      if(hexFile.is_open()) {
-
-        hexFile << "0x" + hexForm << std::endl;
-
-      }
-
-    }
-
-
-
-    std::cout << std::endl;
-    // now we do checks to see what type of thing it is
+      std::cout << std::endl;
   }
 
-  // Close the file (optional as destructor closes it, but good practice)
 
-  binaryFile.close();
-  inputFile.close();
+	// Close the file (optional as destructor closes it, but good practice)
+	inputFile.close();
 
-  return 0;
+	return 0;
 }
 
 std::string registerToBinary(const std::string registerName) {
@@ -280,7 +234,7 @@ std::string convert_IType_Load_Jump(std::string instructionInput, const Instruct
 	return (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
 }
 
-void processBType(std::string line, const Instruction *instruction) {
+std::string processBType(std::string line, const Instruction *instruction) {
   
   // B = imm12 + imm10_5 + rs2 + rs1 + funct3 + imm4_1 + imm11 + opcode
   std::stringstream ss(line);
@@ -321,16 +275,18 @@ void processBType(std::string line, const Instruction *instruction) {
   uint32_t funct3_b = instruction->funct3;
 
   // Get Label address from global map
-  auto it = SymbolTable.find(label);
+  auto it = symbolTable.find(label);
   uint32_t label_b = 0;
-  if (it != SymbolTable.end()) {
+  if (it != symbolTable.end()) {
     label_b = it->second;
   } else {
     std::cout << "Label not found: " << label << "\n";
   }
 
+  //std::cout << "\tLabel Address: " << label_b << ", Current Address: " << currentAddress << "\n";
+
   // Compute offset (label address - PC), then >> 1
-  int32_t offset = label_b - PC;
+  int32_t offset = label_b - currentAddress;
   int32_t imm = offset >> 1;
 
   // Extract immediate fields
@@ -354,7 +310,8 @@ void processBType(std::string line, const Instruction *instruction) {
   std::string binInst = std::bitset<32>(inst).to_string();
   std::string hexInst = binaryToHex(inst);
 
-  std::cout << "\tBinary: " << binInst << " | Hex: " << hexInst << std::endl;
+  //std::cout << "\tBinary: " << binInst;
+  return binInst;
 }
 
 void processSType(std::string line, const Instruction* instruction)
@@ -370,3 +327,49 @@ void processJType(std::string line, const Instruction* instruction)
 	// J = imm + rd + opcode	
 }
 
+void firstPass(std::string filename) {
+    std::ifstream inputFile(filename);
+    if (!inputFile.is_open()) return;
+
+    std::string line;
+    currentAddress = 0;
+    bool inText = false;
+
+    while (std::getline(inputFile, line)) {
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos)
+            line = line.substr(0, commentPos);
+
+        std::stringstream ss(line);
+        std::string token;
+        if (!(ss >> token)) continue;
+
+        if (token == ".data") {
+            inText = false;
+            continue;
+        }
+        if (token == ".text") {
+            inText = true;
+            currentAddress = 0;   // start text at 0
+            continue;
+        }
+
+        if (!inText) {
+            // ignore .data for instruction addresses
+            continue;
+        }
+
+        if (token.back() == ':') {
+            std::string labelName = token.substr(0, token.length() - 1);
+            symbolTable[labelName] = currentAddress;
+            if (!(ss >> token)) continue;
+        }
+
+        if (token == ".globl") continue;
+        if (token == ".word") { currentAddress += 4; continue; }
+
+        if (getInstructions(token) != nullptr) {
+            currentAddress += 4;
+        }
+    }
+}
