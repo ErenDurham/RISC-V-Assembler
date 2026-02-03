@@ -50,8 +50,8 @@ int main(int argc, char* argv[]) {
         baseName = baseName.substr(0, dotPos);
     }
 
-    std::string outputBinPath = baseName + ".bin";
-    std::string outputHexPath = baseName + ".hex.txt";
+    std::string outputBinPath = basePath + baseName + ".bin";
+    std::string outputHexPath = basePath + baseName + ".hex.txt";
 
     firstPass(fullInputPath);
 
