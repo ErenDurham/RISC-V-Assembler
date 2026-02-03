@@ -2,8 +2,6 @@
 #include <bitset>
 #include <fstream>
 #include <iostream>
-#include <sstream>
-#include <string>
 #include <type_traits>
 
 
@@ -17,6 +15,10 @@ void processBType(std::string line, const Instruction* instruction);
 void processUType(std::string line, const Instruction* instruction);
 void processJType(std::string line, const Instruction* instruction);
 
+
+// Global map to store label addresses
+static std::unordered_map<std::string, int32_t> SymbolTable;
+int PC;
 
 int main() {
   // The filename to read
@@ -278,14 +280,86 @@ std::string convert_IType_Load_Jump(std::string instructionInput, const Instruct
 	return (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
 }
 
+void processBType(std::string line, const Instruction *instruction) {
+  
+  // B = imm12 + imm10_5 + rs2 + rs1 + funct3 + imm4_1 + imm11 + opcode
+  std::stringstream ss(line);
+  std::string token;
+  std::string rs1;
+  std::string rs2;
+  std::string label;
+
+  // Parse line: beq rs1, rs2, label
+  ss >> token; // gets instruction name (beq, bne, etc.)
+  ss >> rs1;
+  if (!rs1.empty() && rs1.back() == ',')
+    rs1.pop_back();
+
+  ss >> rs2;
+  if (!rs2.empty() && rs2.back() == ',')
+    rs2.pop_back();
+
+  ss >> label;
+
+  // Collect rs1 and rs2 register values
+  const Register* reg1 = getRegister(rs1);
+  uint32_t rs1_b = 0;
+  if (reg1 != nullptr) {
+    rs1_b = reg1->address;
+  } else {
+    std::cout << "Register not found: " << rs1 << "\n";
+  }
+  const Register* reg2 = getRegister(rs2);
+  uint32_t rs2_b = 0;
+  if (reg2 != nullptr) {
+    rs2_b = reg2->address;
+  } else {
+    std::cout << "Register not found: " << rs2 << "\n";
+  }
+
+  // Get funct3 from instruction struct
+  uint32_t funct3_b = instruction->funct3;
+
+  // Get Label address from global map
+  auto it = SymbolTable.find(label);
+  uint32_t label_b = 0;
+  if (it != SymbolTable.end()) {
+    label_b = it->second;
+  } else {
+    std::cout << "Label not found: " << label << "\n";
+  }
+
+  // Compute offset (label address - PC), then >> 1
+  int32_t offset = label_b - PC;
+  int32_t imm = offset >> 1;
+
+  // Extract immediate fields
+  uint32_t imm12   = (imm >> 12) & 0x1;
+  uint32_t imm11   = (imm >> 11) & 0x1;
+  uint32_t imm10_5 = (imm >> 5)  & 0x3F;
+  uint32_t imm4_1  = (imm >> 1)  & 0xF;
+
+  // Build instruction: imm12[31] + imm10_5[30:25] + rs2[24:20] + rs1[19:15] + funct3[14:12] + imm4_1[11:8] + imm11[7] + opcode[6:0]
+  uint32_t inst = 0;
+  inst |= (imm12   << 31);
+  inst |= (imm10_5 << 25);
+  inst |= (rs2_b   << 20);
+  inst |= (rs1_b   << 15);
+  inst |= (funct3_b << 12);
+  inst |= (imm4_1  << 8);
+  inst |= (imm11   << 7);
+  inst |= instruction->opcode; // B-type opcode is 0x63 (0b1100011)
+
+  // Output results
+  std::string binInst = std::bitset<32>(inst).to_string();
+  std::string hexInst = binaryToHex(inst);
+
+  std::cout << "\tBinary: " << binInst << " | Hex: " << hexInst << std::endl;
+}
+
 void processSType(std::string line, const Instruction* instruction)
 {
 	// S =imm + rs2 + rs1 + funct3 + imm + opcode
-	
-}
-void processBType(std::string line, const Instruction* instruction)
-{
-	// B = imm + rs2 + rs1 + funct3 + imm + opcode
 }
 void processUType(std::string line, const Instruction* instruction)
 {
