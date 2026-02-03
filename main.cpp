@@ -2,16 +2,19 @@
 #include <bitset>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <type_traits>
 
 
-void processRType(std::string line, const Instruction *instruction);
-void processIType(std::string line, const Instruction *instruction);
-void processSType(std::string line, const Instruction *instruction);
-void processBType(std::string line, const Instruction *instruction);
-void processUType(std::string line, const Instruction *instruction);
-void processJType(std::string line, const Instruction *instruction);
+std::string processRType(std::string line, const Instruction* instruction);
+
+std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, const Instruction * instruction);
+std::string convert_IType_Load_Jump(std::string instructionInput, const Instruction* instruction);
+
+void processSType(std::string line, const Instruction* instruction);
+void processBType(std::string line, const Instruction* instruction);
+void processUType(std::string line, const Instruction* instruction);
+void processJType(std::string line, const Instruction* instruction);
+
 
 // Global map to store label addresses
 static std::unordered_map<std::string, int32_t> SymbolTable;
@@ -23,6 +26,11 @@ int main() {
 
   // Open the file
   std::ifstream inputFile(filename);
+
+    std::ofstream binaryFile("add_shift.bin");
+      std::ofstream hexFile("add_shift.hex.txt");
+
+
 
   // Check if the file opened successfully
   if (!inputFile.is_open()) {
@@ -72,6 +80,8 @@ int main() {
     } else {
       const Instruction *instruction = getInstructions(token);
 
+      std::string label;
+
       if (instruction != nullptr) {
         // std::cout << "Found the following: ";
         // std::cout << instruction->name << '\t';
@@ -85,11 +95,18 @@ int main() {
         switch (instruction->type) {
 
         case InstructionType::R:
-          processRType(line, instruction);
+          label = processRType(line, instruction);
           break;
         case InstructionType::I:
-          processIType(line, instruction);
-          break;
+            if (instruction->name == "addi" || instruction->name == "slti" || instruction->name == "sltiu" || instruction->name == "xori" || instruction->name == "ori"|| instruction->name == "andi" || instruction->name == "slli" || instruction->name == "srli" || instruction->name == "srai") {
+                label = convert_IType_Arithmetic_Imm_Shamt(line, instruction);
+
+            } else if(instruction->name == "lb" || instruction->name == "lh" || instruction->name == "lw" || instruction->name == "lbu" || instruction->name == "lhu" || instruction->name == "jalr") {
+                label = convert_IType_Load_Jump(line, instruction);
+
+            }
+            break;
+
         case InstructionType::S:
           processSType(line, instruction);
           break;
@@ -107,12 +124,35 @@ int main() {
           break;
         }
       }
+
+
+      if(binaryFile.is_open()) {
+
+        binaryFile << label << std::endl;
+
+      }
+
+
+      uint32_t binaryDecimalForm = std::bitset<32>(label).to_ulong();
+      std::string hexForm = binaryToHex(binaryDecimalForm);
+
+      if(hexFile.is_open()) {
+
+        hexFile << "0x" + hexForm << std::endl;
+
+      }
+
     }
+
+
+
     std::cout << std::endl;
     // now we do checks to see what type of thing it is
   }
 
   // Close the file (optional as destructor closes it, but good practice)
+
+  binaryFile.close();
   inputFile.close();
 
   return 0;
@@ -133,7 +173,7 @@ std::string registerToBinary(const std::string registerName) {
   return std::bitset<5>(binary).to_string();
 }
 
-void processRType(std::string line, const Instruction *instruction) {
+std::string processRType(std::string line, const Instruction *instruction) {
   // R = funct 7 + rs2 + rs1 + funct3 + rd + opcode
   std::stringstream ss(line);
   std::string token;
@@ -176,13 +216,68 @@ void processRType(std::string line, const Instruction *instruction) {
   // get final result
   std::string binaryResult = binary_funct3 + binary_rs2 + binary_rs1 +
                              binary_funct7 + binary_rd + binary_opcode;
+
+    return binaryResult;
+
 }
 
-void processIType(std::string line, const Instruction *instruction) {
-  // I = imm + rs1 + funct + rd + opcode
+std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, const Instruction * instruction) {
+	std::istringstream sstream(instructionInput);
+	std::string instructionToken;
+	std::vector<std::string> instructionTokens;
+
+	while(sstream >> instructionToken) {
+		instructionTokens.push_back(instructionToken);
+	}
+
+	std::string rd = instructionTokens[1];
+	int commaIndex = rd.find(",");
+	rd.erase(commaIndex, 1);
+
+	std::string rs1 = instructionTokens[2];
+	commaIndex = rs1.find(",");
+	rs1.erase(commaIndex, 1);
+
+	std::string immshamt = instructionTokens[3];
+
+	rd = std::bitset<5>(getRegister(rd)->address).to_string();
+	rs1 = std::bitset<5>(getRegister(rs1)->address).to_string();
+	immshamt = std::bitset<12>(std::stoi(immshamt) & 0xFFF).to_string();
+
+    // std::cout << (immshamt+rs1+std::bitset<3>((instruction->funct3) & 0xFFF).to_string()+rd+std::bitset<7>((instruction->opcode) & 0xFFF).to_string());
+
+	return (immshamt+rs1+std::bitset<3>((instruction->funct3) & 0xFFF).to_string()+rd+std::bitset<7>((instruction->opcode) & 0xFFF).to_string());
 }
-void processSType(std::string line, const Instruction *instruction) {
-  // S =imm + rs2 + rs1 + funct3 + imm + opcode
+
+std::string convert_IType_Load_Jump(std::string instructionInput, const Instruction* instruction) {
+	std::istringstream sstream(instructionInput);
+	std::string instructionToken;
+	std::vector<std::string> instructionTokens;
+
+	while(sstream >> instructionToken) {
+		instructionTokens.push_back(instructionToken);
+	}
+
+	std::string rd = instructionTokens[1];
+	int commaIndex = rd.find(",");
+	rd.erase(commaIndex, 1);
+
+	std::string offsetrs1 = instructionTokens[2];
+
+	int offset = std::stoi(offsetrs1.substr(0, offsetrs1.find('(')));
+	
+    std::string imm = std::bitset<12>(offset & 0xFFF).to_string();
+    
+	int leftparenthesis = offsetrs1.find('(');
+	int rightparenthesis = offsetrs1.find(')');
+	std::string rs1 = offsetrs1.substr(leftparenthesis+1, rightparenthesis-leftparenthesis-1);
+
+	rd = std::bitset<5>(getRegister(rd)->address).to_string();
+	rs1 = std::bitset<5>(getRegister(rs1)->address).to_string();
+
+    // std::cout << (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
+
+	return (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
 }
 
 void processBType(std::string line, const Instruction *instruction) {
@@ -262,9 +357,16 @@ void processBType(std::string line, const Instruction *instruction) {
   std::cout << "\tBinary: " << binInst << " | Hex: " << hexInst << std::endl;
 }
 
-void processUType(std::string line, const Instruction *instruction) {
-  // U = imm + rd + opcodew
+void processSType(std::string line, const Instruction* instruction)
+{
+	// S =imm + rs2 + rs1 + funct3 + imm + opcode
 }
-void processJType(std::string line, const Instruction *instruction) {
-  // J = imm + rd + opcode
+void processUType(std::string line, const Instruction* instruction)
+{
+	// U = imm + rd + opcodew
 }
+void processJType(std::string line, const Instruction* instruction)
+{
+	// J = imm + rd + opcode	
+}
+
