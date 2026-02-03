@@ -20,7 +20,7 @@ void processJType(std::string line, const Instruction* instruction);
 
 int main() {
   // The filename to read
-  std::string filename = "test.s";
+  std::string filename = "add_shift.s";
 
   // Open the file
   std::ifstream inputFile(filename);
@@ -210,6 +210,8 @@ std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, con
 	rs1 = std::bitset<5>(getRegister(rs1)->address).to_string();
 	immshamt = std::bitset<12>(std::stoi(immshamt) & 0xFFF).to_string();
 
+    // std::cout << (immshamt+rs1+std::bitset<3>((instruction->funct3) & 0xFFF).to_string()+rd+std::bitset<7>((instruction->opcode) & 0xFFF).to_string());
+
 	return (immshamt+rs1+std::bitset<3>((instruction->funct3) & 0xFFF).to_string()+rd+std::bitset<7>((instruction->opcode) & 0xFFF).to_string());
 }
 
@@ -238,6 +240,8 @@ std::string convert_IType_Load_Jump(std::string instructionInput, const Instruct
 
 	rd = std::bitset<5>(getRegister(rd)->address).to_string();
 	rs1 = std::bitset<5>(getRegister(rs1)->address).to_string();
+
+    // std::cout << (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
 
 	return (imm+rs1+std::bitset<3>(instruction->funct3).to_string()+rd+std::bitset<7>(instruction->opcode).to_string());
 }
