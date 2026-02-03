@@ -4,8 +4,9 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-
+#include <iomanip>
 #include <unordered_map>
+#include <ios>
 
 
 enum class InstructionType { R, I, S, B, U, J };
@@ -107,7 +108,13 @@ inline std::string typeToString(InstructionType type) {
     }
 }
 
-
+// Convert 32-bit binary result to hex
+std::string binaryToHex(uint32_t inst) {
+  std::stringstream ss;
+  ss << std::uppercase << std::setfill('0') << std::setw(8)
+     << std::hex << inst;
+  return ss.str();
+}
 
 
 struct Register {
