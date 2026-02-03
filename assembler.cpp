@@ -4,7 +4,6 @@
 #include <iostream>
 #include <type_traits>
 #include <unordered_map>
-#include <string>
 
 std::string processRType(std::string line, const Instruction* instruction);
 
@@ -25,51 +24,51 @@ static std::unordered_map<std::string, int32_t> SymbolTable;
 int PC;
 
 int main(int argc, char* argv[]) {
-    
-    if (argc != 3) {
-        return 1;
-    }
-    
+    if (argc != 3) return 1;
+
     std::string basePath = argv[1];
-    std::string inputPath = argv[2]; 
-    
+    std::string inputArg = argv[2];
+
     if (!basePath.empty() && basePath.back() != '/') {
         basePath += '/';
     }
-    
-    std::string filename = inputPath;
-    size_t lastSlash = inputPath.rfind('/');
-    if (lastSlash != std::string::npos) {
-        filename = inputPath.substr(lastSlash + 1);
+
+    std::string fullInputPath = inputArg;
+    if (inputArg.find('/') == std::string::npos) {
+        fullInputPath = basePath + inputArg;
     }
-    
+
+    std::string filename = inputArg;
+    size_t lastSlash = inputArg.rfind('/');
+    if (lastSlash != std::string::npos) {
+        filename = inputArg.substr(lastSlash + 1);
+    }
+
     std::string baseName = filename;
     size_t dotPos = baseName.rfind('.');
     if (dotPos != std::string::npos) {
         baseName = baseName.substr(0, dotPos);
     }
-    
-    std::string outputBinPath = basePath + baseName + ".bin";
-    std::string outputHexPath = basePath + baseName + ".hex.txt";
-    
-	firstPass(inputPath);
 
-    std::ifstream inputFile(inputPath);
+    std::string outputBinPath = baseName + ".bin";
+    std::string outputHexPath = baseName + ".hex.txt";
 
-    std::ofstream binaryFile(outputBinPath);
-    std::ofstream hexFile(outputHexPath);
+    firstPass(fullInputPath);
 
+    std::ifstream inputFile(fullInputPath);
     if (!inputFile.is_open()) {
         return 1;
     }
 
+    std::ofstream binaryFile(outputBinPath);
+    std::ofstream hexFile(outputHexPath);
     std::string line;  
     int lineNum = 0;
     PC = 0; 
+    bool inData = false;
+    bool inText = false;
+    
     while (std::getline(inputFile, line)) {
-        std::cout << lineNum << ": \t|";
-        std::cout << line;
-        
         lineNum++;
 
         size_t commentPos = line.find('#');
@@ -82,16 +81,28 @@ int main(int argc, char* argv[]) {
         std::string token; 
         ss >> token;
 
-        if (token.empty() || token == ".data" || token == ".text" || token == ".globl" || token == ".word") {
-            std::cout << std::endl;
+        if (token == ".data") {
+            inData = true;
+            inText = false;
+            continue;
+        }
+        if (token == ".text") {
+            inData = false;
+            inText = true;
+            continue;
+        }
+        if (token == ".word") {
+            PC += 4;  
+            continue;
+        }
+        
+        if (token.empty() || token == ".globl") {
             continue;
         }
 
         if (token.find(':') != std::string::npos) {
             if (ss >> token) {
-                //There's something after the label, continue processing
             } else {
-                std::cout << std::endl;
                 continue;
             }
         }
@@ -133,7 +144,6 @@ int main(int argc, char* argv[]) {
                 break;
 
             default:
-                std::cout << "defaulting";
                 break;
             }
             
@@ -159,7 +169,6 @@ int main(int argc, char* argv[]) {
 
         }
 
-    std::cout << std::endl;
   }
 
 
@@ -173,7 +182,7 @@ int main(int argc, char* argv[]) {
 std::string registerToBinary(const std::string registerName) {
   std::unordered_map<std::string, int> registerMap = {
       {"zero", 0}, {"ra", 1},  {"sp", 2},  {"gp", 3},  {"tp", 4},  {"t0", 5},
-      {"t1", 6},   {"t2", 7},  {"s0", 8}, // s0 or fp
+      {"t1", 6},   {"t2", 7},  {"s0", 8},
       {"s1", 9},   {"a0", 10}, {"a1", 11}, {"a2", 12}, {"a3", 13}, {"a4", 14},
       {"a5", 15},  {"a6", 16}, {"a7", 17}, {"s2", 18}, {"s3", 19}, {"s4", 20},
       {"s5", 21},  {"s6", 22}, {"s7", 23}, {"s8", 24}, {"s9", 25}, {"s10", 26},
@@ -212,7 +221,6 @@ std::string processRType(std::string line, const Instruction *instruction) {
   if (!rs2.empty() && rs2.back() == ',')
     rs2.pop_back();
 
-  // get binary registers
   std::string binary_rd = registerToBinary(rd);
   std::string binary_rs1 = registerToBinary(rs1);
   std::string binary_rs2 = registerToBinary(rs2);
@@ -344,16 +352,12 @@ std::string processBType(std::string line, const Instruction *instruction) {
   uint32_t rs1_b = 0;
   if (reg1 != nullptr) {
     rs1_b = reg1->address;
-  } else {
-    std::cout << "Register not found: " << rs1 << "\n";
-  }
+  } 
   const Register* reg2 = getRegister(rs2);
   uint32_t rs2_b = 0;
   if (reg2 != nullptr) {
     rs2_b = reg2->address;
-  } else {
-    std::cout << "Register not found: " << rs2 << "\n";
-  }
+  } 
 
   uint32_t funct3_b = instruction->funct3;
 
@@ -361,17 +365,14 @@ std::string processBType(std::string line, const Instruction *instruction) {
   uint32_t label_b = 0;
   if (it != SymbolTable.end()) {
     label_b = it->second;
-  } else {
-    std::cout << "Label not found: " << label << "\n";
-  }
+  } 
 
   int32_t offset = label_b - PC;
-  int32_t imm = offset >> 1;
 
-  uint32_t imm12   = (imm >> 12) & 0x1;
-  uint32_t imm11   = (imm >> 11) & 0x1;
-  uint32_t imm10_5 = (imm >> 5)  & 0x3F;
-  uint32_t imm4_1  = (imm >> 1)  & 0xF;
+  uint32_t imm12   = (offset >> 12) & 0x1;
+  uint32_t imm11   = (offset >> 11) & 0x1;
+  uint32_t imm10_5 = (offset >> 5)  & 0x3F;
+  uint32_t imm4_1  = (offset >> 1)  & 0xF;
 
   uint32_t inst = 0;
   inst |= (imm12   << 31);
@@ -437,7 +438,6 @@ std::string processUType(std::string line, const Instruction* instruction)
 	
 	const Register* reg = getRegister(rd);
 	if (reg == nullptr) {
-		std::cerr << "Error: Invalid register '" << rd << "' in U-type instruction" << std::endl;
 		return std::string(32, '0');
 	}
 	rd_int = reg->address;
@@ -469,13 +469,11 @@ std::string processJType(std::string line, const Instruction* instruction)
 	ss >> label; 
 	
 	if (rd.empty() || label.empty()) {
-		std::cerr << "Error: Not enough tokens in JAL instruction: '" << line << "'" << std::endl;
 		return std::string(32, '0');
 	}
 	
 	const Register* reg = getRegister(rd);
 	if (reg == nullptr) {
-		std::cerr << "Error: Invalid register '" << rd << "' in JAL instruction" << std::endl;
 		return std::string(32, '0');
 	}
 	rd_int = reg->address;
@@ -485,25 +483,19 @@ std::string processJType(std::string line, const Instruction* instruction)
 		int32_t target_addr = SymbolTable[label];
 		offset = target_addr - PC;
 	} else {
-		std::cerr << "Error: Label '" << label << "' not found in symbol table" << std::endl;
 		return std::string(32, '0');
 	}
 
-	uint32_t imm = (uint32_t)offset;
+	uint32_t imm20 = (offset >> 20) & 0x1;    
+	uint32_t imm19_12 = (offset >> 12) & 0xFF;
+	uint32_t imm11 = (offset >> 11) & 0x1;
+	uint32_t imm10_1 = (offset >> 1) & 0x3FF;
 	
-	uint32_t imm20 = (imm >> 20) & 0x1;     
-	uint32_t imm10_1 = (imm >> 1) & 0x3FF;  
-	uint32_t imm11 = (imm >> 11) & 0x1;      
-	uint32_t imm19_12 = (imm >> 12) & 0xFF;  
-
-	uint32_t j_imm = 0;
-	j_imm |= (imm20 << 19);      
-	j_imm |= (imm19_12 << 11);   
-	j_imm |= (imm11 << 10);      
-	j_imm |= imm10_1;     
-
 	uint32_t inst = 0;
-	inst |= (j_imm << 12);
+	inst |= (imm20 << 31);
+	inst |= (imm10_1 << 21);
+	inst |= (imm11 << 20);
+	inst |= (imm19_12 << 12);
 	inst |= (rd_int << 7);
 	inst |= instruction->opcode;
 
@@ -552,7 +544,6 @@ uint32_t parseImmediate(const std::string immediate) {
 void firstPass(std::string filename) {
 	std::ifstream inputFile(filename);
 	if (!inputFile.is_open()) {
-		std::cerr << "Error: Could not open file " << filename << std::endl;
 		return;
 	}
 
@@ -600,7 +591,6 @@ void firstPass(std::string filename) {
 int getRegisterAddressSafe(const std::string& registerName) {
     const Register* reg = getRegister(registerName);
     if (reg == nullptr) {
-        std::cerr << "Error:'" << registerName << "'" << std::endl;
         return 0;
     }
     return reg->address;
