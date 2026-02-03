@@ -11,7 +11,7 @@ std::string convert_IType_Arithmetic_Imm_Shamt(std::string instructionInput, con
 std::string convert_IType_Load_Jump(std::string instructionInput, const Instruction* instruction);
 
 void processSType(std::string line, const Instruction* instruction);
-std::string processBType(std::string line, const Instruction* instruction);
+void processBType(std::string line, const Instruction* instruction);
 void processUType(std::string line, const Instruction* instruction);
 void processJType(std::string line, const Instruction* instruction);
 uint32_t parseImmediate(const std::string immediate);
