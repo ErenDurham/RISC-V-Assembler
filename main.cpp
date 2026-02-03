@@ -352,7 +352,49 @@ std::string processBType(std::string line, const Instruction *instruction) {
 
 std::string processSType(std::string line, const Instruction* instruction)
 {
-    return "";
+    // S =imm + rs2 + rs1 + funct3 + imm + opcode
+	std::stringstream ss(line);
+	std::string token;
+	std::string rs1;
+	std::string rs2;
+	std::string offset;
+	std::string funct3;
+	std::string opcode;
+
+	// parse lin
+	ss >> token; // gets instruction name
+	ss >> rs2; // gets rd
+	rs2.pop_back();
+	ss >> offset; 		// gets offset and next rs1
+	//funct3 = instruction->funct3;
+	//opcode = instruction->opcode;
+
+
+	int start = offset.find('(');
+	int end = offset.find(')');
+
+	rs1 = offset.substr(start+1, end - start -1);
+	offset = offset.substr(0, start);
+
+	int rs2_int = getRegister(rs2)->address;
+	int rs1_int = getRegister(rs1)->address;
+
+	std::string imm_40 = std::bitset<12>(offset).to_string().substr(7);
+	std::string imm_115 = std::bitset<12>(offset).to_string().substr(0,7);
+
+	// std::cout << "\t\t|";
+	// std::cout << token + "(instruction)" + rs2 + "(rs2)" + offset + "(offset)" + rs1 + "(rs1)\n";
+
+	// std::cout << imm_115 << std::endl;
+	// std::cout << imm_40 << std::endl;
+
+
+	// S =imm(11:5) + rs2 + rs1 + funct3 + imm(4:0) + opcode	
+	// std::cout <<"\t|"+ imm_115 + "\t|" + std::bitset<5>(rs2_int).to_string() + "\t|"+std::bitset<5>(rs1_int).to_string()+ "\t|" + std::bitset<3>(instruction->funct3).to_string() + "\t|"+imm_40 + "\t|" + std::bitset<7>(instruction->opcode).to_string();
+
+	std::string binary = imm_115 + std::bitset<5>(rs2_int).to_string()+std::bitset<5>(rs1_int).to_string()+ std::bitset<3>(instruction->funct3).to_string()+imm_40 + std::bitset<7>(instruction->opcode).to_string();
+
+  return binary;
 
 	// S =imm + rs2 + rs1 + funct3 + imm + opcode
 }
