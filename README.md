@@ -36,13 +36,6 @@ Hex: 0x00500293
 
 Binary: 00000000010100000000001010010011
 
-### 2. Directive and Symbol Handling
-The assembler implements a two-pass system to handle forward references and memory layout:
-* **`.data` Directive:** Parses static data allocation and initialization.
-* **`.text` Directive:** Identifies the start of executable code.
-* **`.global` Directive:** Sets the entry point (e.g., `.global main` starts execution at the `main` label).
-* **Labels:** Automatically calculates offsets for branch instructions and resolves absolute addresses for jumps.
-
 ---
 
 ## Interface and Usage
