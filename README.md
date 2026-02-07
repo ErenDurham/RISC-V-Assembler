@@ -3,9 +3,7 @@
 ## Overview
 This project implements a fully functional assembler for the RISC-V RV32I instruction set architecture (ISA). The software automates the translation of assembly source code (`.s`) into machine-readable binary (`.bin`) and hexadecimal text (`.hex.txt`) formats. It features a robust parsing engine capable of handling memory initialization, label resolution, and standard assembly directives.
 
-## Core Functionality
-
-### 1. Instruction Translation
+### Instruction Translation
 The assembler parses and converts all standard RV32I instruction formats (**R, I, S, B, U, J**) into their 32-bit binary equivalents.
 
 The translation logic decomposes instructions into their constituent fields—opcode, destination register (`rd`), function codes (`funct3`, `funct7`), source registers (`rs1`, `rs2`), and immediates—and concatenates them based on the specific instruction format.
