@@ -1,4 +1,4 @@
-# Project: RISC-V Assembler Implementation
+# RISC-V Assembler
 
 ## Overview
 This project implements a fully functional assembler for the RISC-V RV32I instruction set architecture (ISA). The software automates the translation of assembly source code (`.s`) into machine-readable binary (`.bin`) and hexadecimal text (`.hex.txt`) formats. It features a robust parsing engine capable of handling memory initialization, label resolution, and standard assembly directives.
