@@ -33,10 +33,3 @@ For the instruction `addi t0, x0, 5`:
 Hex: 0x00500293
 
 Binary: 00000000010100000000001010010011
-
----
-
-## Interface and Usage
-
-### Command Line Interface
-The tool is designed to be invoked via the command line, accepting a base path and the target assembly file.
