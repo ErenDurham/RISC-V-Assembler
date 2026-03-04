@@ -402,7 +402,7 @@ std::string processSType(std::string line, const Instruction* instruction)
 }
 std::string processUType(std::string line, const Instruction* instruction)
 {
-// U = imm + rd + opcode
+    // U = imm + rd + opcode
 	// needs the labels
 	std::stringstream ss(line);
 	std::string token;
